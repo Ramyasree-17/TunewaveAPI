@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("TunewaveAPI")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+1be080a8a439aa8cecc39be9e5b1faabec45e26a")]
 [assembly: System.Reflection.AssemblyProductAttribute("TunewaveAPI")]
 [assembly: System.Reflection.AssemblyTitleAttribute("TunewaveAPI")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

@@ -79,3 +79,4 @@ C:\Users\ramya\Dotnet\TunewaveAPI\TunewaveAPI\obj\Debug\net8.0\refint\TunewaveAP
 C:\Users\ramya\Dotnet\TunewaveAPI\TunewaveAPI\obj\Debug\net8.0\TunewaveAPI.pdb
 C:\Users\ramya\Dotnet\TunewaveAPI\TunewaveAPI\obj\Debug\net8.0\TunewaveAPI.genruntimeconfig.cache
 C:\Users\ramya\Dotnet\TunewaveAPI\TunewaveAPI\obj\Debug\net8.0\ref\TunewaveAPI.dll
+C:\Users\ramya\Dotnet\TunewaveAPI\TunewaveApI\obj\Debug\net8.0\TunewaveAPI.sourcelink.json

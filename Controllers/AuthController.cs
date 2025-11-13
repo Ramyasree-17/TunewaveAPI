@@ -23,7 +23,7 @@ namespace TunewaveAPI.Controllers
             _connStr = _cfg.GetConnectionString("DefaultConnection")!;
         }
 
-        // ✅ REGISTER USER (Public)
+        // ✅ REGISTER USER (with duplicate check)
         [AllowAnonymous]
         [HttpPost("register")]
         public IActionResult Register([FromBody] RegisterRequest req)
@@ -34,6 +34,19 @@ namespace TunewaveAPI.Controllers
             try
             {
                 using var conn = new SqlConnection(_connStr);
+                conn.Open();
+
+                // Check if Email already exists
+                using (var checkCmd = new SqlCommand("SELECT COUNT(*) FROM Users WHERE Email = @Email", conn))
+                {
+                    checkCmd.Parameters.AddWithValue("@Email", req.Email);
+                    int exists = (int)checkCmd.ExecuteScalar();
+
+                    if (exists > 0)
+                        return Conflict(new { message = "⚠️ Email already registered." });
+                }
+
+                // Insert New User
                 using var cmd = new SqlCommand("sp_RegisterUser", conn)
                 {
                     CommandType = CommandType.StoredProcedure
@@ -52,7 +65,6 @@ namespace TunewaveAPI.Controllers
                 cmd.Parameters.AddWithValue("@PublicProfileName", req.PublicProfileName ?? (object)DBNull.Value);
                 cmd.Parameters.AddWithValue("@LabelName", req.LabelName ?? (object)DBNull.Value);
 
-                conn.Open();
                 cmd.ExecuteNonQuery();
 
                 return Ok(new { message = "✅ User registered successfully" });
@@ -67,7 +79,28 @@ namespace TunewaveAPI.Controllers
             }
         }
 
-        // ✅ LOGIN (Public)
+        // ✅ CHECK EMAIL EXISTS (For frontend validation)
+        [AllowAnonymous]
+        [HttpGet("check-email")]
+        public IActionResult CheckEmail([FromQuery] string email)
+        {
+            if (string.IsNullOrWhiteSpace(email))
+                return BadRequest(new { message = "❌ Email is required." });
+
+            using var conn = new SqlConnection(_connStr);
+            using var cmd = new SqlCommand("SELECT COUNT(*) FROM Users WHERE Email = @Email", conn);
+            cmd.Parameters.AddWithValue("@Email", email);
+
+            conn.Open();
+            int count = (int)cmd.ExecuteScalar();
+
+            if (count > 0)
+                return Ok(new { exists = true, message = "⚠️ Email already registered." });
+            else
+                return Ok(new { exists = false, message = "✅ Email available." });
+        }
+
+        // ✅ LOGIN
         [AllowAnonymous]
         [HttpPost("login")]
         public IActionResult Login([FromBody] LoginRequest req)
@@ -100,12 +133,10 @@ namespace TunewaveAPI.Controllers
 
             reader.Close();
 
-            // Update last login
             using var updateCmd = new SqlCommand("UPDATE Users SET LastSignIn = GETDATE() WHERE UserID = @UserID", conn);
             updateCmd.Parameters.AddWithValue("@UserID", userId);
             updateCmd.ExecuteNonQuery();
 
-            // Create JWT token
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
@@ -133,6 +164,50 @@ namespace TunewaveAPI.Controllers
                 fullName,
                 email
             });
+        }
+
+        // ✅ FORGOT PASSWORD
+        [AllowAnonymous]
+        [HttpPost("forgot-password")]
+        public IActionResult ForgotPassword([FromBody] string email)
+        {
+            if (string.IsNullOrWhiteSpace(email))
+                return BadRequest(new { message = "❌ Email is required." });
+
+            using var conn = new SqlConnection(_connStr);
+            using var cmd = new SqlCommand("SELECT COUNT(*) FROM Users WHERE Email = @Email", conn);
+            cmd.Parameters.AddWithValue("@Email", email);
+
+            conn.Open();
+            int count = (int)cmd.ExecuteScalar();
+
+            if (count == 0)
+                return NotFound(new { message = "❌ Email not found." });
+
+            // Normally we send reset token here; for now just a success message
+            return Ok(new { message = "✅ Reset link (mock) sent successfully." });
+        }
+
+        // ✅ RESET PASSWORD
+        [AllowAnonymous]
+        [HttpPost("reset-password")]
+        public IActionResult ResetPassword([FromBody] ResetPasswordRequest req)
+        {
+            if (string.IsNullOrWhiteSpace(req.Email) || string.IsNullOrWhiteSpace(req.NewPassword))
+                return BadRequest(new { message = "❌ Email and New Password are required." });
+
+            using var conn = new SqlConnection(_connStr);
+            using var cmd = new SqlCommand("UPDATE Users SET PasswordHash = @PasswordHash WHERE Email = @Email", conn);
+            cmd.Parameters.AddWithValue("@Email", req.Email);
+            cmd.Parameters.AddWithValue("@PasswordHash", BCrypt.Net.BCrypt.HashPassword(req.NewPassword));
+
+            conn.Open();
+            int rows = cmd.ExecuteNonQuery();
+
+            if (rows == 0)
+                return NotFound(new { message = "❌ Email not found." });
+
+            return Ok(new { message = "✅ Password reset successful." });
         }
 
         // ✅ VERIFY TOKEN
@@ -176,50 +251,12 @@ namespace TunewaveAPI.Controllers
 
             return Ok(new { message = "✅ Token verified successfully", user });
         }
-
-        // ✅ GET ALL USERS (SuperAdmin only)
-        [HttpGet("all-users")]
-        [Authorize(Roles = "SuperAdmin")]
-        public IActionResult GetAllUsers()
-        {
-            var users = new List<object>();
-
-            using var conn = new SqlConnection(_connStr);
-            using var cmd = new SqlCommand("sp_GetAllUsers", conn)
-            {
-                CommandType = CommandType.StoredProcedure
-            };
-
-            conn.Open();
-            using var reader = cmd.ExecuteReader();
-
-            while (reader.Read())
-            {
-                users.Add(new
-                {
-                    UserID = reader["UserID"],
-                    FullName = reader["FullName"],
-                    Email = reader["Email"],
-                    Role = reader["Role"],
-                    MobileNumber = reader["MobileNumber"],
-                    CountryCode = reader["CountryCode"],
-                    ThresholdValue = reader["ThresholdValue"],
-                    RevenueShare = reader["RevenueShare"],
-                    AgreementStartDate = reader["AgreementStartDate"],
-                    AgreementEndDate = reader["AgreementEndDate"],
-                    PublicProfileName = reader["PublicProfileName"],
-                    LabelName = reader["LabelName"],
-                    LastSignIn = reader["LastSignIn"],
-                    Status = reader["Status"]
-                });
-            }
-
-            return Ok(new
-            {
-                message = "✅ All registered users fetched",
-                count = users.Count,
-                users
-            });
-        }
     }
-}
+
+    // Models for reset
+    public class ResetPasswordRequest
+    {
+        public string Email { get; set; } = "";
+        public string NewPassword { get; set; } = "";
+    }
+}

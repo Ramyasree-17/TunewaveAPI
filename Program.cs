@@ -4,13 +4,28 @@ using Microsoft.OpenApi.Models;
 using System.Security.Claims;
 using System.Text;
 using TunewaveAPI.Middleware;
+using TunewaveAPI.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 🔹 Add controllers
+// Add Controllers
 builder.Services.AddControllers();
 
-// 🔹 Add Swagger with JWT support
+// 🔹 Add CORS Configuration
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy
+            .SetIsOriginAllowed(_ => true) // allow any domain
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials(); // if you need cookies/tokens with requests
+    });
+});
+
+
+// 🔹 Add Swagger Configuration
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
@@ -21,7 +36,6 @@ builder.Services.AddSwaggerGen(options =>
         Description = "Tunewave Music Management API with JWT Authentication and API Key Security"
     });
 
-    // 🔒 Enable JWT Authentication in Swagger
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -29,7 +43,7 @@ builder.Services.AddSwaggerGen(options =>
         Scheme = "bearer",
         BearerFormat = "JWT",
         In = ParameterLocation.Header,
-        Description = "Enter your JWT token in this format: Bearer {your_token}"
+        Description = "Enter JWT token as: Bearer {your_token}"
     });
 
     options.AddSecurityRequirement(new OpenApiSecurityRequirement
@@ -48,7 +62,7 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-// 🔹 Configure JWT Authentication
+// 🔹 JWT Authentication Setup
 var key = Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!);
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -62,37 +76,40 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidIssuer = builder.Configuration["Jwt:Issuer"],
             ValidAudience = builder.Configuration["Jwt:Audience"],
             IssuerSigningKey = new SymmetricSecurityKey(key),
-
-            // 👇 Map role & name claims properly
             RoleClaimType = ClaimTypes.Role,
             NameClaimType = ClaimTypes.Name
         };
     });
 
-// 🔹 Authorization service
 builder.Services.AddAuthorization();
 
-// 🔹 Build the app
+// ✅ (Optional) Register API Key service if required later
+// builder.Services.AddScoped<IApiKeyService, ApiKeyService>();
+
 var app = builder.Build();
 
-// 🔹 Middleware pipeline
+// 🔹 Swagger Configuration (only for Development)
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
+// 🔹 Enforce HTTPS
 app.UseHttpsRedirection();
 
-// 🔹 Custom API Key Middleware (for x-api-key validation)
+// 🔹 Apply CORS Policy (MUST be before Authentication & Authorization)
+app.UseCors("AllowSpecificOrigins");
+
+// 🔹 Custom Middleware (for x-api-key validation)
 app.UseMiddleware<ApiKeyMiddleware>();
 
-// 🔹 Authentication & Authorization
+// 🔹 JWT Authentication and Authorization
 app.UseAuthentication();
 app.UseAuthorization();
 
-// 🔹 Map API Controllers
+// 🔹 Map Controllers
 app.MapControllers();
 
-// 🔹 Run the app
+// 🔹 Run the Application
 app.Run();
