@@ -1,5 +1,6 @@
 C:\Users\ramya\Dotnet\TunewaveAPI\TunewaveAPI\bin\Release\net8.0\appsettings.Development.json
 C:\Users\ramya\Dotnet\TunewaveAPI\TunewaveAPI\bin\Release\net8.0\appsettings.json
+C:\Users\ramya\Dotnet\TunewaveAPI\TunewaveAPI\bin\Release\net8.0\TunewaveAPI.staticwebassets.runtime.json
 C:\Users\ramya\Dotnet\TunewaveAPI\TunewaveAPI\bin\Release\net8.0\TunewaveAPI.staticwebassets.endpoints.json
 C:\Users\ramya\Dotnet\TunewaveAPI\TunewaveAPI\bin\Release\net8.0\TunewaveAPI.exe
 C:\Users\ramya\Dotnet\TunewaveAPI\TunewaveAPI\bin\Release\net8.0\TunewaveAPI.deps.json

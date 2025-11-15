@@ -23,7 +23,9 @@ namespace TunewaveAPI.Controllers
             _connStr = _cfg.GetConnectionString("DefaultConnection")!;
         }
 
-        // ✅ REGISTER USER (with duplicate check)
+        // ================================================
+        // REGISTER USER
+        // ================================================
         [AllowAnonymous]
         [HttpPost("register")]
         public IActionResult Register([FromBody] RegisterRequest req)
@@ -36,7 +38,6 @@ namespace TunewaveAPI.Controllers
                 using var conn = new SqlConnection(_connStr);
                 conn.Open();
 
-                // Check if Email already exists
                 using (var checkCmd = new SqlCommand("SELECT COUNT(*) FROM Users WHERE Email = @Email", conn))
                 {
                     checkCmd.Parameters.AddWithValue("@Email", req.Email);
@@ -46,7 +47,6 @@ namespace TunewaveAPI.Controllers
                         return Conflict(new { message = "⚠️ Email already registered." });
                 }
 
-                // Insert New User
                 using var cmd = new SqlCommand("sp_RegisterUser", conn)
                 {
                     CommandType = CommandType.StoredProcedure
@@ -79,7 +79,9 @@ namespace TunewaveAPI.Controllers
             }
         }
 
-        // ✅ CHECK EMAIL EXISTS (For frontend validation)
+        // ================================================
+        // CHECK EMAIL
+        // ================================================
         [AllowAnonymous]
         [HttpGet("check-email")]
         public IActionResult CheckEmail([FromQuery] string email)
@@ -88,19 +90,46 @@ namespace TunewaveAPI.Controllers
                 return BadRequest(new { message = "❌ Email is required." });
 
             using var conn = new SqlConnection(_connStr);
-            using var cmd = new SqlCommand("SELECT COUNT(*) FROM Users WHERE Email = @Email", conn);
+
+            using var cmd = new SqlCommand(
+                "SELECT FullName, Email, PublicProfileName AS UserName, Role FROM Users WHERE Email = @Email",
+                conn
+            );
+
             cmd.Parameters.AddWithValue("@Email", email);
 
             conn.Open();
-            int count = (int)cmd.ExecuteScalar();
+            using var reader = cmd.ExecuteReader();
 
-            if (count > 0)
-                return Ok(new { exists = true, message = "⚠️ Email already registered." });
-            else
-                return Ok(new { exists = false, message = "✅ Email available." });
+            if (reader.Read())
+            {
+                string role = "";
+
+                try
+                {
+                    role = reader["Role"]?.ToString() ?? "";
+                }
+                catch
+                {
+                    role = "";
+                }
+
+                return Ok(new
+                {
+                    exists = true,
+                    display_name = reader["FullName"]?.ToString(),
+                    email = reader["Email"]?.ToString(),
+                    username = reader["UserName"]?.ToString(),
+                    role = role
+                });
+            }
+
+            return Ok(new { exists = false });
         }
 
-        // ✅ LOGIN
+        // ================================================
+        // LOGIN
+        // ================================================
         [AllowAnonymous]
         [HttpPost("login")]
         public IActionResult Login([FromBody] LoginRequest req)
@@ -122,18 +151,21 @@ namespace TunewaveAPI.Controllers
             if (!reader.Read())
                 return Unauthorized(new { message = "❌ Invalid credentials (Email not found)" });
 
-            var userId = (int)reader["UserID"];
-            var email = reader["Email"].ToString()!;
-            var fullName = reader["FullName"].ToString() ?? "";
-            var hash = reader["PasswordHash"].ToString() ?? "";
-            var role = reader["Role"]?.ToString() ?? "User";
+            int userId = (int)reader["UserID"];
+            string email = reader["Email"].ToString()!;
+            string fullName = reader["FullName"]?.ToString() ?? "";
+            string hash = reader["PasswordHash"]?.ToString() ?? "";
+
+            string role = reader["Role"]?.ToString() ?? "User";
 
             if (!BCrypt.Net.BCrypt.Verify(req.Password, hash))
                 return Unauthorized(new { message = "❌ Invalid credentials (Incorrect password)" });
 
             reader.Close();
 
-            using var updateCmd = new SqlCommand("UPDATE Users SET LastSignIn = GETDATE() WHERE UserID = @UserID", conn);
+            using var updateCmd = new SqlCommand(
+                "UPDATE Users SET LastSignIn = GETDATE() WHERE UserID = @UserID", conn
+            );
             updateCmd.Parameters.AddWithValue("@UserID", userId);
             updateCmd.ExecuteNonQuery();
 
@@ -166,7 +198,9 @@ namespace TunewaveAPI.Controllers
             });
         }
 
-        // ✅ FORGOT PASSWORD
+        // ================================================
+        // FORGOT PASSWORD
+        // ================================================
         [AllowAnonymous]
         [HttpPost("forgot-password")]
         public IActionResult ForgotPassword([FromBody] string email)
@@ -176,6 +210,7 @@ namespace TunewaveAPI.Controllers
 
             using var conn = new SqlConnection(_connStr);
             using var cmd = new SqlCommand("SELECT COUNT(*) FROM Users WHERE Email = @Email", conn);
+
             cmd.Parameters.AddWithValue("@Email", email);
 
             conn.Open();
@@ -184,11 +219,12 @@ namespace TunewaveAPI.Controllers
             if (count == 0)
                 return NotFound(new { message = "❌ Email not found." });
 
-            // Normally we send reset token here; for now just a success message
             return Ok(new { message = "✅ Reset link (mock) sent successfully." });
         }
 
-        // ✅ RESET PASSWORD
+        // ================================================
+        // RESET PASSWORD
+        // ================================================
         [AllowAnonymous]
         [HttpPost("reset-password")]
         public IActionResult ResetPassword([FromBody] ResetPasswordRequest req)
@@ -197,7 +233,11 @@ namespace TunewaveAPI.Controllers
                 return BadRequest(new { message = "❌ Email and New Password are required." });
 
             using var conn = new SqlConnection(_connStr);
-            using var cmd = new SqlCommand("UPDATE Users SET PasswordHash = @PasswordHash WHERE Email = @Email", conn);
+            using var cmd = new SqlCommand(
+                "UPDATE Users SET PasswordHash = @PasswordHash WHERE Email = @Email",
+                conn
+            );
+
             cmd.Parameters.AddWithValue("@Email", req.Email);
             cmd.Parameters.AddWithValue("@PasswordHash", BCrypt.Net.BCrypt.HashPassword(req.NewPassword));
 
@@ -210,12 +250,15 @@ namespace TunewaveAPI.Controllers
             return Ok(new { message = "✅ Password reset successful." });
         }
 
-        // ✅ VERIFY TOKEN
+        // ================================================
+        // VERIFY TOKEN
+        // ================================================
         [HttpGet("verify")]
         [Authorize]
         public IActionResult Verify()
         {
-            var email = User.FindFirst(ClaimTypes.Email)?.Value;
+            string? email = User.FindFirst(ClaimTypes.Email)?.Value;
+
             if (string.IsNullOrEmpty(email))
                 return Unauthorized(new { message = "❌ Invalid or missing token" });
 
@@ -224,10 +267,12 @@ namespace TunewaveAPI.Controllers
             {
                 CommandType = CommandType.StoredProcedure
             };
+
             cmd.Parameters.AddWithValue("@Email", email);
 
             conn.Open();
             using var reader = cmd.ExecuteReader();
+
             if (!reader.Read())
                 return NotFound(new { message = "❌ User not found" });
 
@@ -253,10 +298,9 @@ namespace TunewaveAPI.Controllers
         }
     }
 
-    // Models for reset
     public class ResetPasswordRequest
     {
         public string Email { get; set; } = "";
         public string NewPassword { get; set; } = "";
     }
-}
+}

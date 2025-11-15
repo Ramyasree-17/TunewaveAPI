@@ -1,49 +1,45 @@
 ﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using System.Security.Claims;
 using System.Text;
-using TunewaveAPI.Middleware;
-using TunewaveAPI.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add Controllers
+// 🔹 Controllers
 builder.Services.AddControllers();
 
-// 🔹 Add CORS Configuration
+// 🔹 Wildcard Localhost CORS
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", policy =>
+    options.AddPolicy("DevCors", policy =>
     {
         policy
-            .SetIsOriginAllowed(_ => true) // allow any domain
+            .SetIsOriginAllowed(origin =>
+                origin.StartsWith("http://localhost") ||
+                origin.StartsWith("http://127.0.0.1"))
             .AllowAnyHeader()
             .AllowAnyMethod()
-            .AllowCredentials(); // if you need cookies/tokens with requests
+            .AllowCredentials();
     });
 });
 
-
-// 🔹 Add Swagger Configuration
+// 🔹 Swagger with JWT Security
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo
     {
         Title = "TunewaveAPI",
-        Version = "v1",
-        Description = "Tunewave Music Management API with JWT Authentication and API Key Security"
+        Version = "v1"
     });
 
+    // JWT Authorization
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
-        Name = "Authorization",
-        Type = SecuritySchemeType.Http,
-        Scheme = "bearer",
-        BearerFormat = "JWT",
         In = ParameterLocation.Header,
-        Description = "Enter JWT token as: Bearer {your_token}"
+        Description = "Enter token like: Bearer {your_token}",
+        Name = "Authorization",
+        Type = SecuritySchemeType.ApiKey
     });
 
     options.AddSecurityRequirement(new OpenApiSecurityRequirement
@@ -75,41 +71,42 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuerSigningKey = true,
             ValidIssuer = builder.Configuration["Jwt:Issuer"],
             ValidAudience = builder.Configuration["Jwt:Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(key),
-            RoleClaimType = ClaimTypes.Role,
-            NameClaimType = ClaimTypes.Name
+            IssuerSigningKey = new SymmetricSecurityKey(key)
         };
     });
 
 builder.Services.AddAuthorization();
 
-// ✅ (Optional) Register API Key service if required later
-// builder.Services.AddScoped<IApiKeyService, ApiKeyService>();
-
 var app = builder.Build();
 
-// 🔹 Swagger Configuration (only for Development)
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
-
-// 🔹 Enforce HTTPS
+// 🔹 Static files & HTTPS
+app.UseStaticFiles();
 app.UseHttpsRedirection();
 
-// 🔹 Apply CORS Policy (MUST be before Authentication & Authorization)
-app.UseCors("AllowSpecificOrigins");
+// 🔹 CORS BEFORE Authentication
+app.UseCors("DevCors");
 
-// 🔹 Custom Middleware (for x-api-key validation)
-app.UseMiddleware<ApiKeyMiddleware>();
-
-// 🔹 JWT Authentication and Authorization
+// 🔹 Authentication & Authorization
 app.UseAuthentication();
 app.UseAuthorization();
+
+// 🔹 Swagger (Production-safe with JWT protection)
+app.UseSwagger();
+app.UseSwaggerUI(c =>
+{
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "TunewaveAPI v1");
+    c.RoutePrefix = "swagger"; // Swagger will be available at /swagger
+});
+
+// Optional: Protect Swagger UI with JWT
+app.UseWhen(context => context.Request.Path.StartsWithSegments("/swagger"), appBuilder =>
+{
+    appBuilder.UseAuthentication();
+    appBuilder.UseAuthorization();
+});
 
 // 🔹 Map Controllers
 app.MapControllers();
 
-// 🔹 Run the Application
+// 🔹 Run
 app.Run();

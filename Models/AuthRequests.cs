@@ -14,6 +14,9 @@
         public DateTime? AgreementEndDate { get; set; }
         public string? PublicProfileName { get; set; }
         public string? LabelName { get; set; }
+
+        // NEW
+        public string? ProfileImage { get; set; }
     }
 
     public class LoginRequest
