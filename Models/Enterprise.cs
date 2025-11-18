@@ -2,23 +2,34 @@
 {
     public class Enterprise
     {
-        public int EnterpriseID { get; set; }
+        // ============================
+        // ✔ Primary Key (AlphaNumeric)
+        // Example: B01, A9C, T2X
+        // ============================
+        public string EnterpriseId { get; set; } = string.Empty;
+
+        // ============================
+        // ✔ Basic Details
+        // ============================
         public string EnterpriseName { get; set; } = string.Empty;
         public string? Domain { get; set; }
         public decimal RevenueShare { get; set; }
         public bool QCRequired { get; set; }
         public string Status { get; set; } = "Active";
-        public int CreatedBy { get; set; }
-        public int? OwnedBy { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime? UpdatedAt { get; set; }
 
-        // Owner info
-        public int? OwnerID { get; set; }
+        // ============================
+        // ✔ Owner Information
+        // ============================
+        public int? OwnerUserId { get; set; }
         public string OwnerName { get; set; } = string.Empty;
         public string OwnerEmail { get; set; } = string.Empty;
 
-        // Optional: only if you plan to create from backend
-        public string OwnerPasswordHash { get; set; } = string.Empty;
+        // ============================
+        // ✔ Audit Fields
+        // ============================
+        public int CreatedBy { get; set; }
+        public int? UpdatedBy { get; set; }
+        public DateTime CreatedDate { get; set; }
+        public DateTime? UpdatedDate { get; set; }
     }
 }

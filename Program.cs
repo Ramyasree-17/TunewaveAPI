@@ -8,18 +8,15 @@ var builder = WebApplication.CreateBuilder(args);
 // 🔹 Controllers
 builder.Services.AddControllers();
 
-// 🔹 Wildcard Localhost CORS
+// 🔹 CORS Policy – allow all origins, headers, and methods
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("DevCors", policy =>
+    options.AddPolicy("OpenCors", policy =>
     {
         policy
-            .SetIsOriginAllowed(origin =>
-                origin.StartsWith("http://localhost") ||
-                origin.StartsWith("http://127.0.0.1"))
-            .AllowAnyHeader()
-            .AllowAnyMethod()
-            .AllowCredentials();
+            .AllowAnyOrigin()   // allow requests from any domain
+            .AllowAnyHeader()   // allow any HTTP header
+            .AllowAnyMethod();  // allow GET, POST, PUT, DELETE, etc.
     });
 });
 
@@ -59,7 +56,8 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 // 🔹 JWT Authentication Setup
-var key = Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!);
+// Replace these with your appsettings values if needed
+var key = Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"] ?? "SuperSecretKey123!");
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -69,8 +67,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
-            ValidAudience = builder.Configuration["Jwt:Audience"],
+            ValidIssuer = builder.Configuration["Jwt:Issuer"] ?? "https://spacestation.tunewave.in",
+            ValidAudience = builder.Configuration["Jwt:Audience"] ?? "https://spacestation.tunewave.in",
             IssuerSigningKey = new SymmetricSecurityKey(key)
         };
     });
@@ -79,26 +77,37 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-// 🔹 Static files & HTTPS
-app.UseStaticFiles();
-app.UseHttpsRedirection();
+// 🔹 Exception Handling
+if (app.Environment.IsDevelopment())
+{
+    app.UseDeveloperExceptionPage();
+}
+else
+{
+    app.UseExceptionHandler("/error"); // optional: map an ErrorController
+    app.UseHsts();
+}
 
-// 🔹 CORS BEFORE Authentication
-app.UseCors("DevCors");
+// 🔹 HTTPS & Static files
+app.UseHttpsRedirection();
+app.UseStaticFiles();
+
+// 🔹 Apply CORS
+app.UseCors("OpenCors");
 
 // 🔹 Authentication & Authorization
 app.UseAuthentication();
 app.UseAuthorization();
 
-// 🔹 Swagger (Production-safe with JWT protection)
+// 🔹 Swagger (accessible with JWT)
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
     c.SwaggerEndpoint("/swagger/v1/swagger.json", "TunewaveAPI v1");
-    c.RoutePrefix = "swagger"; // Swagger will be available at /swagger
+    c.RoutePrefix = "swagger";
 });
 
-// Optional: Protect Swagger UI with JWT
+// Optional: protect Swagger UI
 app.UseWhen(context => context.Request.Path.StartsWithSegments("/swagger"), appBuilder =>
 {
     appBuilder.UseAuthentication();

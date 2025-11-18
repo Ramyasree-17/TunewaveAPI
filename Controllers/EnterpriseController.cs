@@ -21,67 +21,55 @@ namespace TunewaveAPI.Controllers
             _connStr = _cfg.GetConnectionString("DefaultConnection")!;
         }
 
-        // =======================================================
-        // ✅ Add Enterprise with Owner (SuperAdmin + SuperAdminUser only)
-        // =======================================================
-        [HttpPost("add")]
-        public IActionResult AddEnterprise([FromBody] EnterpriseCreateRequest req)
+        // =====================================================================
+        // 1️⃣ CREATE ENTERPRISE
+        // =====================================================================
+        [HttpPost]
+        public IActionResult CreateEnterprise([FromBody] EnterpriseCreateV2 req)
         {
             var role = User.FindFirst(ClaimTypes.Role)?.Value;
-            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            var createdBy = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
 
-            if (role != "SuperAdmin" && role != "SuperAdminUser")
-                return StatusCode(403, new { message = "❌ Only SuperAdmin or SuperAdminUser can create enterprises" });
+            if (role != "SuperAdmin")
+                return StatusCode(403, new { message = "Only SuperAdmin can create enterprises" });
 
             using var conn = new SqlConnection(_connStr);
-            using var cmd = new SqlCommand("sp_CreateEnterpriseWithOwner", conn)
+            using var cmd = new SqlCommand("sp_CreateEnterprise_AutoOwner", conn)
             {
                 CommandType = CommandType.StoredProcedure
             };
 
-            // Match stored procedure parameters
             cmd.Parameters.AddWithValue("@EnterpriseName", req.EnterpriseName);
-            cmd.Parameters.AddWithValue("@Domain", req.Domain ?? (object)DBNull.Value);
+            cmd.Parameters.AddWithValue("@Domain", string.IsNullOrWhiteSpace(req.Domain) ? DBNull.Value : req.Domain);
             cmd.Parameters.AddWithValue("@RevenueShare", req.RevenueShare);
             cmd.Parameters.AddWithValue("@QCRequired", req.QCRequired);
-            cmd.Parameters.AddWithValue("@CreatedBy", userId);
-            cmd.Parameters.AddWithValue("@OwnerFullName", req.OwnerFullName);
             cmd.Parameters.AddWithValue("@OwnerEmail", req.OwnerEmail);
-            cmd.Parameters.AddWithValue("@OwnerPasswordHash", BCrypt.Net.BCrypt.HashPassword(req.OwnerPasswordHash));
+            cmd.Parameters.AddWithValue("@CreatedBy", createdBy);
 
             conn.Open();
             using var reader = cmd.ExecuteReader();
 
-            if (reader.Read())
-            {
-                var result = new
-                {
-                    EnterpriseID = reader["EnterpriseID"],
-                    EnterpriseName = reader["EnterpriseName"],
-                    Domain = reader["Domain"],
-                    RevenueShare = reader["RevenueShare"],
-                    QCRequired = reader["QCRequired"],
-                    Status = reader["Status"],
-                    CreatedBy = reader["CreatedBy"],
-                    //OwnedBy = reader["OwnedBy"],
-                    CreatedAt = reader["CreatedAt"],
-                    UpdatedAt = reader["UpdatedAt"],
-                    OwnerID = reader["OwnerID"],
-                    OwnerName = reader["OwnerName"]?.ToString(),
-                    OwnerEmail = reader["OwnerEmail"]?.ToString(),
-                    OwnedBy = reader["OwnedBy"]
-                };
-                return Ok(new { message = "✅ Enterprise created successfully", enterprise = result });
-            }
+            if (!reader.Read())
+                return BadRequest(new { message = "Enterprise creation failed" });
 
-            return BadRequest(new { message = "❌ Enterprise creation failed" });
+            return StatusCode(201, new
+            {
+                status = "success",
+                message = "Enterprise created successfully",
+                enterpriseId = reader["EnterpriseID"],
+                ownerUserId = reader["OwnerUserID"],
+                ownerStatus = reader["OwnerStatus"]
+            });
         }
 
-        // =======================================================
-        // ✅ Get All Enterprises
-        // =======================================================
-        [HttpGet("all")]
-        public IActionResult GetAllEnterprises()
+        // =====================================================================
+        // 2️⃣ GET ALL ENTERPRISES
+        // =====================================================================
+        // =====================================================================
+        // 2️⃣ GET ALL ENTERPRISES  (UPDATED FINAL VERSION)
+        // =====================================================================
+        [HttpGet]
+        public IActionResult GetEnterprises([FromQuery] string? status, [FromQuery] string? search)
         {
             var role = User.FindFirst(ClaimTypes.Role)?.Value;
             var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
@@ -89,81 +77,155 @@ namespace TunewaveAPI.Controllers
             using var conn = new SqlConnection(_connStr);
             SqlCommand cmd;
 
+            // -----------------------------------------------------------------
+            // 🔹 EnterpriseAdmin → Get ONLY the enterprise he owns
+            // -----------------------------------------------------------------
             if (role == "EnterpriseAdmin")
             {
-                cmd = new SqlCommand("sp_GetEnterpriseByCreatedBy", conn)
+                cmd = new SqlCommand("sp_GetEnterpriseByOwner", conn)
                 {
                     CommandType = CommandType.StoredProcedure
                 };
-                cmd.Parameters.AddWithValue("@CreatedBy", userId);
+                cmd.Parameters.AddWithValue("@OwnerId", userId);
             }
+            // -----------------------------------------------------------------
+            // 🔹 SuperAdmin → Get ALL enterprises with filters
+            // -----------------------------------------------------------------
             else
             {
-                cmd = new SqlCommand(@"
-                    SELECT e.EnterpriseID,
-                           e.EnterpriseName,
-                           e.Domain,
-                           e.RevenueShare,
-                           e.QCRequired,
-                           e.Status,
-                           u.UserID AS OwnerID,
-                           u.FullName AS OwnerName,
-                           u.Email AS OwnerEmail,
-                           e.CreatedBy,
-                           e.OwnedBy,
-                           e.CreatedAt,
-                           e.UpdatedAt
-                    FROM Enterprises e
-                    LEFT JOIN Users u ON e.OwnedBy = u.UserID
-                    ORDER BY e.EnterpriseID
-                ", conn);
-                cmd.CommandType = CommandType.Text;
+                cmd = new SqlCommand("sp_GetAllEnterprises_Filter", conn)
+                {
+                    CommandType = CommandType.StoredProcedure
+                };
+
+                cmd.Parameters.AddWithValue("@Status",
+                    string.IsNullOrWhiteSpace(status) ? DBNull.Value : status);
+
+                cmd.Parameters.AddWithValue("@Search",
+                    string.IsNullOrWhiteSpace(search) ? DBNull.Value : search);
             }
 
             conn.Open();
             using var reader = cmd.ExecuteReader();
+
             var list = new List<object>();
 
             while (reader.Read())
             {
                 list.Add(new
                 {
-                    EnterpriseID = reader["EnterpriseID"],
-                    EnterpriseName = reader["EnterpriseName"],
-                    Domain = reader["Domain"],
-                    RevenueShare = reader["RevenueShare"],
-                    QCRequired = reader["QCRequired"],
-                    Status = reader["Status"],
-                    OwnerID = reader["OwnerID"],
-                    OwnerName = reader["OwnerName"]?.ToString(),
-                    OwnerEmail = reader["OwnerEmail"]?.ToString(),
-                    CreatedBy = reader["CreatedBy"],
-                    OwnedBy = reader["OwnedBy"],
-                    CreatedAt = reader["CreatedAt"],
-                    UpdatedAt = reader["UpdatedAt"]
+                    enterpriseId = reader["EnterpriseID"],
+                    enterpriseName = reader["EnterpriseName"],
+                    domain = reader["Domain"],
+                    revenueShare = reader["RevenueShare"],
+                    qcRequired = reader["QCRequired"],
+                    status = reader["Status"],
+                    owner = new
+                    {
+                        userId = reader["OwnerID"],
+                        fullName = reader["OwnerName"],
+                        email = reader["OwnerEmail"]
+                    },
+                    createdBy = reader["CreatedByName"],
+                    createdAt = reader["CreatedAt"]
                 });
             }
 
+            return Ok(list);
+        }
+
+        // =====================================================================
+        // 3️⃣ UPDATE ENTERPRISE DETAILS
+        // =====================================================================
+        [HttpPut("{enterpriseId}")]
+        public IActionResult UpdateEnterprise(int enterpriseId, [FromBody] EnterpriseUpdateRequest req)
+        {
+            var role = User.FindFirst(ClaimTypes.Role)?.Value;
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
+            if (role != "SuperAdmin" && role != "EnterpriseAdmin")
+                return StatusCode(403, new { message = "Unauthorized" });
+
+            using var conn = new SqlConnection(_connStr);
+            using var cmd = new SqlCommand("sp_UpdateEnterprise", conn)
+            {
+                CommandType = CommandType.StoredProcedure
+            };
+
+            cmd.Parameters.AddWithValue("@EnterpriseId", enterpriseId);
+            cmd.Parameters.AddWithValue("@Domain", string.IsNullOrWhiteSpace(req.Domain) ? DBNull.Value : req.Domain);
+            cmd.Parameters.AddWithValue("@RevenueShare", req.RevenueShare);
+            cmd.Parameters.AddWithValue("@QCRequired", req.QCRequired);
+            cmd.Parameters.AddWithValue("@UpdatedBy", userId);
+
+            conn.Open();
+            var rows = cmd.ExecuteNonQuery();
+
+            if (rows == 0)
+                return NotFound(new { message = "Enterprise not found" });
+
             return Ok(new
             {
-                message = "✅ Enterprises fetched successfully",
-                count = list.Count,
-                enterprises = list
+                status = "updated",
+                message = "Enterprise details updated successfully"
+            });
+        }
+
+        // =====================================================================
+        // 4️⃣ UPDATE ENTERPRISE STATUS
+        // =====================================================================
+        [HttpPost("status")]
+        public IActionResult UpdateStatus([FromQuery] int id, [FromQuery] string status)
+        {
+            var role = User.FindFirst(ClaimTypes.Role)?.Value;
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
+            if (role != "SuperAdmin")
+                return StatusCode(403, new { message = "Only SuperAdmin can update enterprise status" });
+
+            using var conn = new SqlConnection(_connStr);
+            using var cmd = new SqlCommand("sp_UpdateEnterpriseStatus", conn)
+            {
+                CommandType = CommandType.StoredProcedure
+            };
+
+            // ✅ Match SP parameters exactly
+            cmd.Parameters.AddWithValue("@EnterpriseId", id);
+            cmd.Parameters.AddWithValue("@Status", status);
+            cmd.Parameters.AddWithValue("@UpdatedBy", userId);
+
+            conn.Open();
+            using var reader = cmd.ExecuteReader();
+
+            if (!reader.Read())
+                return NotFound(new { message = "Enterprise not found" });
+
+            return Ok(new
+            {
+                enterpriseId = reader["EnterpriseID"],
+                enterpriseName = reader["EnterpriseName"],
+                status = reader["Status"],
+                message = "Enterprise status updated successfully"
             });
         }
     }
 
-    // ================================
-    // Request model for creating enterprise
-    // ================================
-    public class EnterpriseCreateRequest
+    // =====================================================================
+    // DTOs
+    // =====================================================================
+    public class EnterpriseCreateV2
     {
         public string EnterpriseName { get; set; } = string.Empty;
         public string? Domain { get; set; }
         public decimal RevenueShare { get; set; }
         public bool QCRequired { get; set; }
-        public string OwnerFullName { get; set; } = string.Empty;
         public string OwnerEmail { get; set; } = string.Empty;
-        public string OwnerPasswordHash { get; set; } = string.Empty;
+    }
+
+    public class EnterpriseUpdateRequest
+    {
+        public string? Domain { get; set; }
+        public decimal RevenueShare { get; set; }
+        public bool QCRequired { get; set; }
     }
 }
