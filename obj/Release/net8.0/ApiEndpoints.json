@@ -207,20 +207,25 @@
   },
   {
     "ContainingType": "TunewaveAPI.Controllers.LabelController",
-    "Method": "AddLabel",
-    "RelativePath": "api/Label/add",
-    "HttpMethod": "POST",
+    "Method": "GetLabels",
+    "RelativePath": "api/labels",
+    "HttpMethod": "GET",
     "IsController": true,
     "Order": 0,
     "Parameters": [
       {
-        "Name": "req",
-        "Type": "TunewaveAPI.Models.Label",
-        "IsRequired": true
+        "Name": "status",
+        "Type": "System.String",
+        "IsRequired": false
       },
       {
-        "Name": "x-api-key",
-        "Type": "System.String",
+        "Name": "page",
+        "Type": "System.Nullable\u00601[[System.Int32, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]",
+        "IsRequired": false
+      },
+      {
+        "Name": "limit",
+        "Type": "System.Nullable\u00601[[System.Int32, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]",
         "IsRequired": false
       }
     ],
@@ -228,16 +233,85 @@
   },
   {
     "ContainingType": "TunewaveAPI.Controllers.LabelController",
-    "Method": "GetLabels",
-    "RelativePath": "api/Label/all",
-    "HttpMethod": "GET",
+    "Method": "CreateLabel",
+    "RelativePath": "api/labels",
+    "HttpMethod": "POST",
     "IsController": true,
     "Order": 0,
     "Parameters": [
       {
-        "Name": "x-api-key",
-        "Type": "System.String",
-        "IsRequired": false
+        "Name": "model",
+        "Type": "TunewaveAPI.Models.LabelCreateRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TunewaveAPI.Controllers.LabelController",
+    "Method": "UpdateLabel",
+    "RelativePath": "api/labels/{labelId}",
+    "HttpMethod": "PUT",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "labelId",
+        "Type": "System.Int32",
+        "IsRequired": true
+      },
+      {
+        "Name": "model",
+        "Type": "TunewaveAPI.Models.LabelUpdateRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TunewaveAPI.Controllers.LabelController",
+    "Method": "ChangeStatus",
+    "RelativePath": "api/labels/status",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "model",
+        "Type": "TunewaveAPI.Models.LabelStatusRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TunewaveAPI.Controllers.LabelController",
+    "Method": "TransferLabel",
+    "RelativePath": "api/labels/transfer",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "model",
+        "Type": "TunewaveAPI.Models.LabelTransferRequest",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "TunewaveAPI.Controllers.LabelController",
+    "Method": "RequestTransfer",
+    "RelativePath": "api/labels/transfer-request",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "model",
+        "Type": "TunewaveAPI.Models.LabelTransferRequest",
+        "IsRequired": true
       }
     ],
     "ReturnTypes": []

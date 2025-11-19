@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Configuration;
 using System.Data;
 using System.Security.Claims;
 using TunewaveAPI.Models;
@@ -21,12 +22,50 @@ namespace TunewaveAPI.Controllers
             _connStr = _cfg.GetConnectionString("DefaultConnection")!;
         }
 
+        private string GenerateTicketTrackId()
+        {
+            // Prefix for ticket
+            string prefix = "T";
+
+            // Generate 2-digit random number
+            var rnd = new Random();
+            int randomNumber = rnd.Next(0, 100); // 0 - 99
+            string randomNumberStr = randomNumber.ToString("D2"); // ensures 2 digits, e.g. 05, 12
+
+            // Combine
+            return $"{prefix}{randomNumberStr}";
+        }
+
+        private string GenerateEnterpriseId(string enterpriseName)
+        {
+            if (string.IsNullOrWhiteSpace(enterpriseName))
+                throw new ArgumentException("Enterprise name cannot be empty");
+
+            // First letter uppercase
+            string firstLetter = enterpriseName.Substring(0, 1).ToUpper();
+
+            // Generate 2-character alphanumeric
+            const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+            var rnd = new Random();
+            string nextTwo = new string(Enumerable.Range(0, 2)
+                .Select(_ => chars[rnd.Next(chars.Length)]).ToArray());
+
+            return firstLetter + nextTwo; // Example: S1F
+        }
+
+
+
+
+
+
         // =====================================================================
         // 1️⃣ CREATE ENTERPRISE
         // =====================================================================
         [HttpPost]
         public IActionResult CreateEnterprise([FromBody] EnterpriseCreateV2 req)
         {
+            string enterpriseIdStr = GenerateEnterpriseId(req.EnterpriseName);
+
             var role = User.FindFirst(ClaimTypes.Role)?.Value;
             var createdBy = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
 
@@ -42,6 +81,7 @@ namespace TunewaveAPI.Controllers
             cmd.Parameters.AddWithValue("@EnterpriseName", req.EnterpriseName);
             cmd.Parameters.AddWithValue("@Domain", string.IsNullOrWhiteSpace(req.Domain) ? DBNull.Value : req.Domain);
             cmd.Parameters.AddWithValue("@RevenueShare", req.RevenueShare);
+            cmd.Parameters.AddWithValue("@EnterPriseTrackId", enterpriseIdStr);
             cmd.Parameters.AddWithValue("@QCRequired", req.QCRequired);
             cmd.Parameters.AddWithValue("@OwnerEmail", req.OwnerEmail);
             cmd.Parameters.AddWithValue("@CreatedBy", createdBy);

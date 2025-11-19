@@ -351,35 +351,63 @@
         }
       }
     },
-    "/api/Label/add": {
-      "post": {
+    "/api/labels": {
+      "get": {
         "tags": [
           "Label"
         ],
         "parameters": [
           {
-            "name": "x-api-key",
-            "in": "header",
+            "name": "status",
+            "in": "query",
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 50
+            }
           }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Label"
         ],
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Label"
+                "$ref": "#/components/schemas/LabelCreateRequest"
               }
             },
             "text/json": {
               "schema": {
-                "$ref": "#/components/schemas/Label"
+                "$ref": "#/components/schemas/LabelCreateRequest"
               }
             },
             "application/*+json": {
               "schema": {
-                "$ref": "#/components/schemas/Label"
+                "$ref": "#/components/schemas/LabelCreateRequest"
               }
             }
           }
@@ -391,20 +419,134 @@
         }
       }
     },
-    "/api/Label/all": {
-      "get": {
+    "/api/labels/{labelId}": {
+      "put": {
         "tags": [
           "Label"
         ],
         "parameters": [
           {
-            "name": "x-api-key",
-            "in": "header",
+            "name": "labelId",
+            "in": "path",
+            "required": true,
             "schema": {
-              "type": "string"
+              "type": "integer",
+              "format": "int32"
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabelUpdateRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabelUpdateRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabelUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/labels/transfer": {
+      "post": {
+        "tags": [
+          "Label"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabelTransferRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabelTransferRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabelTransferRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/labels/transfer-request": {
+      "post": {
+        "tags": [
+          "Label"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabelTransferRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabelTransferRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabelTransferRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/labels/status": {
+      "post": {
+        "tags": [
+          "Label"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabelStatusRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabelStatusRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabelStatusRequest"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Success"
@@ -588,13 +730,9 @@
         },
         "additionalProperties": false
       },
-      "Label": {
+      "LabelCreateRequest": {
         "type": "object",
         "properties": {
-          "labelID": {
-            "type": "integer",
-            "format": "int32"
-          },
           "enterpriseID": {
             "type": "integer",
             "format": "int32"
@@ -603,24 +741,83 @@
             "type": "string",
             "nullable": true
           },
-          "domain": {
+          "planType": {
             "type": "string",
             "nullable": true
           },
-          "planType": {
+          "qcRequired": {
+            "type": "boolean"
+          },
+          "domain": {
             "type": "string",
             "nullable": true
           },
           "revenueShare": {
             "type": "number",
             "format": "double"
-          },
-          "qcRequired": {
-            "type": "boolean"
-          },
-          "createdBy": {
+          }
+        },
+        "additionalProperties": false
+      },
+      "LabelStatusRequest": {
+        "type": "object",
+        "properties": {
+          "labelId": {
             "type": "integer",
             "format": "int32"
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "remarks": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "LabelTransferRequest": {
+        "type": "object",
+        "properties": {
+          "labelId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "oldEnterpriseId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "newEnterpriseId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "LabelUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "nullable": true
+          },
+          "qcRequired": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "revenueShare": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
